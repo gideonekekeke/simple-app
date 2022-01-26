@@ -5,6 +5,7 @@ const initialState = {
 	sideBarID: [],
 	ProjectID: [],
 	TaskID: [],
+	stepsID: [],
 };
 
 const ReduxState = createSlice({
@@ -21,7 +22,7 @@ const ReduxState = createSlice({
 			state.ProjectID = payload;
 		},
 		ViewTaskID: (state, { payload }) => {
-			state.sideBarID = payload;
+			state.TaskID = payload;
 		},
 	},
 });

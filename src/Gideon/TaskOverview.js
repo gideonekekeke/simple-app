@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useContext } from "react";
 import styled from "styled-components";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { ImCancelCircle } from "react-icons/im";
 import { SiTodoist } from "react-icons/si";
 import { FaUserCircle } from "react-icons/fa";
@@ -11,59 +11,179 @@ import { Checkbox } from "@mui/material";
 import Box from "@mui/material/Box";
 import LinearProgress from "@mui/material/LinearProgress";
 import { FormControlLabel } from "@mui/material";
+import { app } from "../Base";
+import { AuthContext } from "../Global/AuthContext";
+import firebase from "firebase";
+import { useDispatch, useSelector } from "react-redux";
+import ConfirmModal from "./ConfirmModal";
+import { ViewTaskID } from "../Global/ReduxState";
 const TaskOverview = () => {
+	const { currentUser } = useContext(AuthContext);
 	const [checked, setChecked] = React.useState(false);
-	const [progress, setProgress] = React.useState(10);
+	const [progress, setProgress] = React.useState(0);
+	const [total, setTotal] = React.useState(0);
+	const [steps, setSteps] = React.useState("");
+	const [project, setProject] = React.useState([]);
+	const [singleData, setSingleData] = React.useState([]);
+	const [taskItem, setTaskItem] = React.useState([]);
+
+	const [togCheck, setTogCheck] = React.useState(false);
+
+	const handtogCheck = () => {
+		setTogCheck(!togCheck);
+	};
+	const { id } = useParams();
+	const dispatch = useDispatch();
+
+	const spaceID = useSelector((state) => state.persistedReducer.sideBarID);
+	const proID = useSelector((state) => state.persistedReducer.ProjectID);
+
+	const navigate = useNavigate();
 
 	const handleChanges = (event) => {
 		setChecked(event.target.checked);
 	};
 
+	const CreateTaskSteps = async () => {
+		await app
+			.firestore()
+			.collection("workspace")
+			.doc(spaceID)
+			.collection("project")
+			.doc(proID)
+			.collection("task")
+			.doc(id)
+			.collection("mysteps")
+			.doc()
+			.set({
+				steps,
+				confirm: false,
+				createdBy: currentUser?.uid,
+				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+			});
+		setSteps("");
+	};
+
+	const viewSingleData = async () => {
+		await app
+			.firestore()
+			.collection("workspace")
+			.doc(spaceID)
+			.collection("project")
+			.doc(proID)
+			.get()
+			.then((doc) => {
+				setSingleData(doc.data());
+			});
+	};
+	const viewTaskItems = async () => {
+		await app
+			.firestore()
+			.collection("workspace")
+			.doc(spaceID)
+			.collection("project")
+			.doc(proID)
+			.collection("task")
+			.doc(id)
+			.get()
+			.then((doc) => {
+				setTaskItem(doc.data());
+			});
+	};
+	const viewWrokStation = async () => {
+		await app
+			.firestore()
+			.collection("workspace")
+			.doc(spaceID)
+			.collection("project")
+			.doc(proID)
+			.collection("task")
+			.doc(id)
+			.collection("mysteps")
+			.onSnapshot((snapshot) => {
+				const r = [];
+				snapshot.forEach((doc) => {
+					r.push({ ...doc.data(), id: doc.id });
+				});
+				setProject(r);
+			});
+	};
+
+	const getDone = () => {
+		let checked = project.filter((el) => el.confirm === true).length;
+		setProgress(checked);
+		setTotal(project.length);
+	};
+
+	React.useEffect(() => {
+		viewWrokStation();
+		getDone();
+		viewSingleData();
+		viewTaskItems();
+		console.log(singleData);
+	}, [id]);
+
 	return (
 		<Container>
 			<Card>
 				<HeaderPart>
-					<Title>Agriculture Deploy</Title>
+					<Title>{singleData.ProjectName}</Title>
 					<CancelHold>
-						<ImCancelCircle />
+						<ImCancelCircle
+							onClick={() => {
+								navigate(-1);
+							}}
+						/>
 					</CancelHold>
 				</HeaderPart>
 				<BoxHold>
 					<Box1>
-						<TitleHold>Feed The Cow</TitleHold>
+						<TitleHold>{taskItem.title}</TitleHold>
 						<ContentHold>
-							<CheckBoxHolder>
-								<FormControlLabel
-									style={{ marginTop: "10px", fontSize: "15px" }}
-									onChange={handleChanges}
-									width='300px'
-									label='A Terms and Conditions agreement or a Privacy Policy are legally binding agreements.'
-									control={<Checkbox color='primary' checked={checked} />}
-								/>
-							</CheckBoxHolder>
+							{project?.map((props) => (
+								<Div key={props.id}>
+									<br />
+
+									{props.confirm ? (
+										<Boxs type='checkbox' checked />
+									) : (
+										<Link to={`/questionstep/${props.id}`}>
+											{" "}
+											<Boxs
+												onClick={() => {
+													dispatch(ViewTaskID(id));
+													handtogCheck();
+												}}
+												type='checkbox'
+											/>
+										</Link>
+									)}
+									<Text>{props.steps} </Text>
+								</Div>
+							))}
 							<AddHolder>
 								<span>
-									<MdAddBox />
+									<MdAddBox onClick={CreateTaskSteps} />
 								</span>
-								<input placeholder='Set your progerss /  milestones' />
+								<input
+									onChange={(e) => {
+										setSteps(e.target.value);
+									}}
+									placeholder='Set your progerss /  milestones'
+								/>
 							</AddHolder>
-							{checked ? (
-								<ButtonHold1 bg='red'>Submit</ButtonHold1>
-							) : (
-								<ButtonHold1 disabled={true} bg='#cccccc'>
-									Submit
-								</ButtonHold1>
-							)}
 						</ContentHold>
-						<But>
-							<ButtonHold bg='#0F9D58'>
-								{" "}
-								<span style={{ marginTop: "5px", marginRight: "10px" }}>
-									<MdTaskAlt />
-								</span>
-								Done
-							</ButtonHold>
-						</But>
+						{project ? (
+							<But>
+								<ButtonHold bg='#0F9D58'>
+									{" "}
+									<span style={{ marginTop: "5px", marginRight: "10px" }}>
+										<MdTaskAlt />
+									</span>
+									Add to Progress
+								</ButtonHold>
+							</But>
+						) : null}
 					</Box1>
 
 					<Box2>
@@ -103,21 +223,45 @@ const TaskOverview = () => {
 									</SecondText>
 									<SecondText>
 										<Prior></Prior>
-										<span style={{ marginLeft: "10px" }}> High</span>
+										<span style={{ marginLeft: "10px" }}>
+											{" "}
+											{singleData.priority}
+										</span>
 									</SecondText>
 									<SecondText>
-										<Box sx={{ width: "100px" }}>
-											<LinearProgress variant='determinate' value={progress} />
-										</Box>
-										<span style={{ marginLeft: "10px" }}>{progress}%</span>
+										<div>
+											{
+												<Rating
+													onClick={() => {
+														const checked = project.filter(
+															(el) => el.confirm === true,
+														).length;
+														const totalRate = project.length;
+														console.log((checked / totalRate) * 100);
+													}}>
+													<LinearProgress
+														variant='determinate'
+														value={
+															(project.filter((el) => el.confirm === true)
+																.length /
+																project.length) *
+															100
+														}
+													/>
+													{Math.ceil(
+														(project.filter((el) => el.confirm === true)
+															.length /
+															project.length) *
+															100,
+													)}
+													%
+												</Rating>
+											}
+										</div>
 									</SecondText>
 									<SecondText>Dec 04, 2021</SecondText>
 									<SecondText>Nov 23 - Nov 27</SecondText>
-									<SecondText>
-										It is a long established fact that a reader will be
-										distracted by the readable content of a page when looking at
-										its layout.
-									</SecondText>
+									<SecondText>{taskItem.description}</SecondText>
 								</SecondHold>
 							</Holder>
 						</TwoHold>
@@ -129,6 +273,31 @@ const TaskOverview = () => {
 };
 
 export default TaskOverview;
+
+const Rating = styled.div`
+	width: 200px;
+`;
+
+const Text = styled.div`
+	font-size: ${({ fs }) => (fs ? "30px" : "15px")};
+	min-width: 300px;
+	/* text-align: center; */
+	span {
+		text-transform: capitalize;
+		font-weight: bold;
+	}
+`;
+
+const Boxs = styled.input`
+	width: 20px;
+	height: 20px;
+	margin-right: 5px;
+`;
+const Div = styled.div`
+	display: flex;
+	align-items: center;
+	margin: 10px;
+`;
 
 const TitleHold = styled.div`
 	margin: 10px;
